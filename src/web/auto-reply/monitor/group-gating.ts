@@ -1,6 +1,8 @@
+import type { SkillCommandSpec } from "../../../agents/skills/types.js";
 import { hasControlCommand } from "../../../auto-reply/command-detection.js";
 import { parseActivationCommand } from "../../../auto-reply/group-activation.js";
 import { recordPendingHistoryEntryIfEnabled } from "../../../auto-reply/reply/history.js";
+import { listSkillCommandsForAgents } from "../../../auto-reply/skill-commands.js";
 import { resolveMentionGating } from "../../../channels/mention-gating.js";
 import type { loadConfig } from "../../../config/config.js";
 import { normalizeE164 } from "../../../utils.js";
@@ -10,6 +12,20 @@ import type { WebInboundMsg } from "../types.js";
 import { stripMentionsForCommand } from "./commands.js";
 import { resolveGroupActivationFor, resolveGroupPolicyFor } from "./group-activation.js";
 import { noteGroupMember } from "./group-members.js";
+
+/**
+ * Cached skill commands for mention-bypass detection.
+ * Keyed by config reference — refreshes automatically on config reload.
+ */
+let _skillCmdCache: { ref: unknown; commands: SkillCommandSpec[] } | undefined;
+function resolveSkillCommandsCached(cfg: ReturnType<typeof loadConfig>): SkillCommandSpec[] {
+  if (_skillCmdCache?.ref === cfg) {
+    return _skillCmdCache.commands;
+  }
+  const commands = listSkillCommandsForAgents({ cfg });
+  _skillCmdCache = { ref: cfg, commands };
+  return commands;
+}
 
 export type GroupHistoryEntry = {
   sender: string;
@@ -101,7 +117,9 @@ export function applyGroupGating(params: ApplyGroupGatingParams) {
   );
   const activationCommand = parseActivationCommand(commandBody);
   const owner = isOwnerSender(params.baseMentionConfig, params.msg);
-  const shouldBypassMention = owner && hasControlCommand(commandBody, params.cfg);
+  const skillCommands = owner ? resolveSkillCommandsCached(params.cfg) : undefined;
+  const shouldBypassMention =
+    owner && hasControlCommand(commandBody, params.cfg, { skillCommands });
 
   if (activationCommand.hasCommand && !owner) {
     return skipGroupMessageAndStoreHistory(
