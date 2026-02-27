@@ -309,6 +309,7 @@ export const OpenClawSchema = z
     media: z
       .object({
         preserveFilenames: z.boolean().optional(),
+        localRoots: z.array(z.string()).optional(),
       })
       .strict()
       .optional(),

@@ -214,8 +214,29 @@ export async function listWhatsAppDirectoryGroupsFromConfig(
   params: DirectoryConfigParams,
 ): Promise<ChannelDirectoryEntry[]> {
   const account = resolveWhatsAppAccount({ cfg: params.cfg, accountId: params.accountId });
-  const ids = Object.keys(account.groups ?? {})
-    .map((id) => id.trim())
-    .filter((id) => Boolean(id) && id !== "*");
-  return toDirectoryEntries("group", applyDirectoryQueryAndLimit(ids, params));
+  const groups = account.groups ?? {};
+  const entries: ChannelDirectoryEntry[] = Object.entries(groups)
+    .filter(([id]) => Boolean(id.trim()) && id.trim() !== "*")
+    .map(
+      ([id, groupCfg]): ChannelDirectoryEntry => ({
+        kind: "group",
+        id: id.trim(),
+        ...(groupCfg &&
+        typeof groupCfg === "object" &&
+        "name" in groupCfg &&
+        typeof groupCfg.name === "string"
+          ? { name: groupCfg.name }
+          : {}),
+      }),
+    );
+
+  const q = resolveDirectoryQuery(params.query);
+  const limit = resolveDirectoryLimit(params.limit);
+  const filtered = entries.filter((entry) => {
+    if (!q) {
+      return true;
+    }
+    return entry.id.toLowerCase().includes(q) || (entry.name?.toLowerCase().includes(q) ?? false);
+  });
+  return typeof limit === "number" ? filtered.slice(0, limit) : filtered;
 }

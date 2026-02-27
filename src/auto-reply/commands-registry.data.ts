@@ -462,6 +462,13 @@ function buildChatCommands(): ChatCommandDefinition[] {
       category: "tools",
     }),
     defineChatCommand({
+      key: "powernap",
+      nativeName: "powernap",
+      description: "Reset all sessions and restart gateway.",
+      textAlias: "/powernap",
+      category: "management",
+    }),
+    defineChatCommand({
       key: "activation",
       nativeName: "activation",
       description: "Set group activation mode.",
